@@ -38,4 +38,12 @@ jobs:
             fi
           done
 
-      - run: ./mvnw --batch-mode verify
+      # Resolve the Maven distribution (MVNW_*) and all artifacts (settings.xml) via the mirror
+      - run: ./mvnw --batch-mode --settings .mvn/settings.xml verify
+        env:
+          MAVEN_MIRROR_URL: ${{ secrets.MAVEN_MIRROR_URL }}
+          MAVEN_MIRROR_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
+          MAVEN_MIRROR_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
+          MVNW_REPOURL: ${{ secrets.MAVEN_MIRROR_URL }}
+          MVNW_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
+          MVNW_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}

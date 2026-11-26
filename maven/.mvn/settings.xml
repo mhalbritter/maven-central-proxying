@@ -1,0 +1,17 @@
+<settings>
+  <mirrors>
+    <mirror>
+      <id>maven-mirror</id>
+      <mirrorOf>central</mirrorOf>
+      <url>${env.MAVEN_MIRROR_URL}</url>
+    </mirror>
+  </mirrors>
+  <!-- Mirror credentials, matched by mirror id. -->
+  <servers>
+    <server>
+      <id>maven-mirror</id>
+      <username>${env.MAVEN_MIRROR_USERNAME}</username>
+      <password>${env.MAVEN_MIRROR_PASSWORD}</password>
+    </server>
+  </servers>
+</settings>
