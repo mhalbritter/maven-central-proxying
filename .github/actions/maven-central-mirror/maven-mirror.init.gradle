@@ -5,7 +5,7 @@
 // Other repositories (e.g. Gradle Plugin Portal) are left alone, the mirror only proxies Central.
 //
 // Needs env:
-//   MAVEN_MIRROR_URL       e.g. http://localhost:18080/central
+//   MAVEN_MIRROR_URL       e.g. http://localhost:18080/central, unset or empty disables the mirror
 //   MAVEN_MIRROR_USERNAME  mirror credentials
 //   MAVEN_MIRROR_PASSWORD
 //
@@ -35,7 +35,13 @@ class MavenMirrorPlugin implements Plugin<Gradle> {
 
     @Override
     void apply(Gradle gradle) {
-        url = URI.create(requireEnv(URL_ENV))
+        String mirrorUrl = System.getenv(URL_ENV)
+        if (!mirrorUrl) {
+            Logging.getLogger(MavenMirrorPlugin).info("Maven mirror: ${URL_ENV} is not set, using Maven Central directly")
+            return
+        }
+
+        url = URI.create(mirrorUrl)
         user = requireEnv(USER_ENV)
         password = requireEnv(PASSWORD_ENV)
 
