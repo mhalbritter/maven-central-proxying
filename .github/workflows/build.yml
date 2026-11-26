@@ -18,10 +18,18 @@ jobs:
           - project: maven
             command: ./mvnw --batch-mode --settings .mvn/settings.xml verify
           - project: gradle
-            command: ./gradlew --init-script maven-mirror.init.gradle build
+            command: ./gradlew build
     defaults:
       run:
         working-directory: ${{ matrix.project }}
+    # Mirror config for every build in the job (Maven: settings.xml + MVNW_*, Gradle: init script)
+    env:
+      MAVEN_MIRROR_URL: ${{ secrets.MAVEN_MIRROR_URL }}
+      MAVEN_MIRROR_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
+      MAVEN_MIRROR_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
+      MVNW_REPOURL: ${{ secrets.MAVEN_MIRROR_URL }}
+      MVNW_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
+      MVNW_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -48,13 +56,13 @@ jobs:
             fi
           done
 
-      # Resolve all artifacts via the mirror (Maven: settings.xml, Gradle: init script).
-      # Maven also loads its distribution via the mirror (MVNW_*), Gradle's comes from services.gradle.org.
+      # Gradle applies every *.init.gradle in $GRADLE_USER_HOME/init.d, so builds need no -I flag
+      - name: Install Gradle mirror init script
+        working-directory: .
+        run: |
+          init_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+          mkdir -p "$init_dir"
+          cp .github/mirror/maven-mirror.init.gradle "$init_dir/"
+
+      # Gradle's distribution comes from services.gradle.org, not via the mirror
       - run: ${{ matrix.command }}
-        env:
-          MAVEN_MIRROR_URL: ${{ secrets.MAVEN_MIRROR_URL }}
-          MAVEN_MIRROR_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
-          MAVEN_MIRROR_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
-          MVNW_REPOURL: ${{ secrets.MAVEN_MIRROR_URL }}
-          MVNW_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
-          MVNW_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
