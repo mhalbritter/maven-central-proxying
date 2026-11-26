@@ -1,2 +1,4 @@
 .idea/
 maven/target/
+gradle/build/
+gradle/.gradle/

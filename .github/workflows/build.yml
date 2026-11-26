@@ -11,9 +11,17 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: maven
+            command: ./mvnw --batch-mode --settings .mvn/settings.xml verify
+          - project: gradle
+            command: ./gradlew --init-script maven-mirror.init.gradle build
     defaults:
       run:
-        working-directory: maven
+        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -40,8 +48,9 @@ jobs:
             fi
           done
 
-      # Resolve the Maven distribution (MVNW_*) and all artifacts (settings.xml) via the mirror
-      - run: ./mvnw --batch-mode --settings .mvn/settings.xml verify
+      # Resolve all artifacts via the mirror (Maven: settings.xml, Gradle: init script).
+      # Maven also loads its distribution via the mirror (MVNW_*), Gradle's comes from services.gradle.org.
+      - run: ${{ matrix.command }}
         env:
           MAVEN_MIRROR_URL: ${{ secrets.MAVEN_MIRROR_URL }}
           MAVEN_MIRROR_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
