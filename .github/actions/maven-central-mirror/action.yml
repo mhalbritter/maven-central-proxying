@@ -1,0 +1,54 @@
+name: Maven Central mirror
+description: Routes Maven Central downloads of all following Maven and Gradle builds in the job through a mirror.
+
+# Maven ──► MAVEN_ARGS --global-settings settings.xml ──┐
+# mvnw  ──► MVNW_REPOURL (Maven distribution) ──────────┼──► mirror ──► Maven Central
+# Gradle ─► ~/.gradle/init.d/maven-mirror.init.gradle ──┘
+
+inputs:
+  url:
+    description: Mirror base URL, e.g. https://repo.example.com/central
+    required: true
+  username:
+    description: Mirror username
+    required: true
+  password:
+    description: Mirror password or token
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Configure Maven Central mirror
+      shell: bash
+      env:
+        MIRROR_URL: ${{ inputs.url }}
+        MIRROR_USERNAME: ${{ inputs.username }}
+        MIRROR_PASSWORD: ${{ inputs.password }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        # Keep the password out of logs, even if it's not passed from a secret
+        echo "::add-mask::$MIRROR_PASSWORD"
+
+        # mvnw appends the distribution path, e.g. <url>/org/apache/maven/..., so drop a trailing slash
+        url="${MIRROR_URL%/}"
+
+        # Read by settings.xml, the Gradle init script and mvnw
+        {
+          echo "MAVEN_MIRROR_URL=$url"
+          echo "MAVEN_MIRROR_USERNAME=$MIRROR_USERNAME"
+          echo "MAVEN_MIRROR_PASSWORD=$MIRROR_PASSWORD"
+          echo "MVNW_REPOURL=$url"
+          echo "MVNW_USERNAME=$MIRROR_USERNAME"
+          echo "MVNW_PASSWORD=$MIRROR_PASSWORD"
+        } >> "$GITHUB_ENV"
+
+        # Maven: MAVEN_ARGS goes before the CLI arguments, and the first --global-settings wins,
+        # so this survives a build's own --settings / --global-settings.
+        # Global settings merge with the user settings, e.g. the ~/.m2/settings.xml written by setup-java.
+        echo "MAVEN_ARGS=${MAVEN_ARGS:+$MAVEN_ARGS }--global-settings $ACTION_PATH/settings.xml" >> "$GITHUB_ENV"
+
+        # Gradle: applies every *.init.gradle in $GRADLE_USER_HOME/init.d, so builds need no -I flag
+        init_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+        mkdir -p "$init_dir"
+        cp "$ACTION_PATH/maven-mirror.init.gradle" "$init_dir/"

@@ -22,14 +22,6 @@ jobs:
     defaults:
       run:
         working-directory: ${{ matrix.project }}
-    # Mirror credentials for every build in the job (Maven: settings.xml + MVNW_*, Gradle: init script)
-    env:
-      MAVEN_MIRROR_URL: ${{ secrets.MAVEN_MIRROR_URL }}
-      MAVEN_MIRROR_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
-      MAVEN_MIRROR_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
-      MVNW_REPOURL: ${{ secrets.MAVEN_MIRROR_URL }}
-      MVNW_USERNAME: ${{ secrets.MAVEN_MIRROR_USERNAME }}
-      MVNW_PASSWORD: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -56,20 +48,10 @@ jobs:
             fi
           done
 
-      # Gradle applies every *.init.gradle in $GRADLE_USER_HOME/init.d, so builds need no -I flag
-      - name: Install Gradle mirror init script
-        working-directory: .
-        run: |
-          init_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
-          mkdir -p "$init_dir"
-          cp .github/mirror/maven-mirror.init.gradle "$init_dir/"
+      - uses: ./.github/actions/maven-central-mirror
+        with:
+          url: ${{ secrets.MAVEN_MIRROR_URL }}
+          username: ${{ secrets.MAVEN_MIRROR_USERNAME }}
+          password: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
 
-      # MAVEN_ARGS goes before the CLI arguments, and the first --global-settings wins,
-      # so this survives a build's own --settings / --global-settings.
-      # Global settings merge with the user settings, e.g. the ~/.m2/settings.xml written by setup-java.
-      - name: Install Maven mirror settings
-        working-directory: .
-        run: echo "MAVEN_ARGS=${MAVEN_ARGS:+$MAVEN_ARGS }--global-settings $GITHUB_WORKSPACE/.github/mirror/settings.xml" >> "$GITHUB_ENV"
-
-      # Gradle's distribution comes from services.gradle.org, not via the mirror
       - run: ${{ matrix.command }}
