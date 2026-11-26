@@ -1,0 +1,62 @@
+name: Blackhole Maven Central
+description: Makes Maven Central unreachable for the rest of the job, to prove builds only use a mirror.
+
+# Resolves the hosts to unroutable addresses via the hosts file, so any access fails fast:
+#
+#   repo.maven.apache.org ──► 0.0.0.0 / :: ──► Connection refused
+#
+# Doesn't catch hardcoded IPs or containers with their own DNS.
+
+inputs:
+  hosts:
+    description: Space-separated hostnames serving Maven Central
+    default: repo.maven.apache.org repo1.maven.org
+
+runs:
+  using: composite
+  steps:
+    - name: Blackhole Maven Central
+      shell: bash
+      env:
+        MAVEN_CENTRAL_HOSTS: ${{ inputs.hosts }}
+      run: |
+        # Windows has no sudo, the runner user is an administrator already
+        hosts=/etc/hosts
+        as_admin() { sudo "$@"; }
+        if [ "$RUNNER_OS" = Windows ]; then
+          hosts="$SYSTEMROOT/System32/drivers/etc/hosts"
+          as_admin() { "$@"; }
+        fi
+
+        # Leading newline, in case the file doesn't end with one
+        {
+          echo
+          for host in $MAVEN_CENTRAL_HOSTS; do
+            printf '0.0.0.0 %s\n:: %s\n' "$host" "$host"
+          done
+        } | as_admin tee -a "$hosts"
+
+        # Drop cached Central addresses (macOS: mDNSResponder, Windows: DNS Client service)
+        case "$RUNNER_OS" in
+          macOS)
+            sudo dscacheutil -flushcache
+            sudo killall -HUP mDNSResponder
+            ;;
+          Windows)
+            # Keep Git Bash from turning /flushdns into a path
+            MSYS_NO_PATHCONV=1 ipconfig /flushdns
+            ;;
+        esac
+
+    # Fail if the blackhole doesn't work
+    - name: Verify Maven Central is unreachable
+      shell: bash
+      env:
+        MAVEN_CENTRAL_HOSTS: ${{ inputs.hosts }}
+      run: |
+        for host in $MAVEN_CENTRAL_HOSTS; do
+          if curl --silent --max-time 10 "https://$host/maven2/" > /dev/null; then
+            echo "::error::$host is still reachable"
+            exit 1
+          fi
+        done
