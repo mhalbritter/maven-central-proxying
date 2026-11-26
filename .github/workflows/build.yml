@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+env:
+  # Hostnames serving Maven Central
+  MAVEN_CENTRAL_HOSTS: repo.maven.apache.org repo1.maven.org
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,6 +20,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
-          cache-dependency-path: maven/pom.xml
+
+      # Resolve Maven Central to unroutable addresses (IPv4 + IPv6), so any access fails fast
+      - name: Blackhole Maven Central
+        run: |
+          for host in $MAVEN_CENTRAL_HOSTS; do
+            printf '0.0.0.0 %s\n:: %s\n' "$host" "$host" | sudo tee -a /etc/hosts
+          done
+
+      # Fail if the blackhole doesn't work
+      - name: Verify Maven Central is unreachable
+        run: |
+          for host in $MAVEN_CENTRAL_HOSTS; do
+            if curl --silent --max-time 10 "https://$host/maven2/" > /dev/null; then
+              echo "::error::$host is still reachable"
+              exit 1
+            fi
+          done
+
       - run: ./mvnw --batch-mode verify
