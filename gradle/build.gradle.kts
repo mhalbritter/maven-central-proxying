@@ -1,5 +1,9 @@
 plugins {
     java
+
+    // Resolved via the Gradle Plugin Portal, which redirects its dependencies to Maven Central.
+    // Not applied, resolving the plugin classpath is enough to hit Central.
+    id("org.springframework.boot") version "4.2.0" apply false
 }
 
 group = "com.example"
