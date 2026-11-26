@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         project: [maven, gradle]
         # Adds the build command to each os / project combination
         include:
@@ -24,6 +24,8 @@ jobs:
             command: ./gradlew build
     defaults:
       run:
+        # Git Bash on Windows
+        shell: bash
         working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v7
@@ -37,15 +39,33 @@ jobs:
       # Resolve Maven Central to unroutable addresses (IPv4 + IPv6), so any access fails fast
       - name: Blackhole Maven Central
         run: |
-          for host in $MAVEN_CENTRAL_HOSTS; do
-            printf '0.0.0.0 %s\n:: %s\n' "$host" "$host" | sudo tee -a /etc/hosts
-          done
-
-          # macOS caches lookups in mDNSResponder, so drop cached Central addresses
-          if [ "$RUNNER_OS" = macOS ]; then
-            sudo dscacheutil -flushcache
-            sudo killall -HUP mDNSResponder
+          # Windows has no sudo, the runner user is an administrator already
+          hosts=/etc/hosts
+          as_admin() { sudo "$@"; }
+          if [ "$RUNNER_OS" = Windows ]; then
+            hosts="$SYSTEMROOT/System32/drivers/etc/hosts"
+            as_admin() { "$@"; }
           fi
+
+          # Leading newline, in case the file doesn't end with one
+          {
+            echo
+            for host in $MAVEN_CENTRAL_HOSTS; do
+              printf '0.0.0.0 %s\n:: %s\n' "$host" "$host"
+            done
+          } | as_admin tee -a "$hosts"
+
+          # Drop cached Central addresses (macOS: mDNSResponder, Windows: DNS Client service)
+          case "$RUNNER_OS" in
+            macOS)
+              sudo dscacheutil -flushcache
+              sudo killall -HUP mDNSResponder
+              ;;
+            Windows)
+              # Keep Git Bash from turning /flushdns into a path
+              MSYS_NO_PATHCONV=1 ipconfig /flushdns
+              ;;
+          esac
 
       # Fail if the blackhole doesn't work
       - name: Verify Maven Central is unreachable
@@ -63,4 +83,10 @@ jobs:
           username: ${{ secrets.MAVEN_MIRROR_USERNAME }}
           password: ${{ secrets.MAVEN_MIRROR_PASSWORD }}
 
-      - run: ${{ matrix.command }}
+      - if: runner.os != 'Windows'
+        run: ${{ matrix.command }}
+
+      # Native shell on Windows, so mvnw.cmd / gradlew.bat run, like for Windows users
+      - if: runner.os == 'Windows'
+        run: ${{ matrix.command }}
+        shell: pwsh
