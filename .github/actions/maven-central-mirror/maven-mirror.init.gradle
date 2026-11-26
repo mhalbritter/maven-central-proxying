@@ -2,7 +2,11 @@
 //
 //   mavenCentral() ──► $MAVEN_MIRROR_URL ──► Maven Central (on cache miss)
 //
-// Other repositories (e.g. Gradle Plugin Portal) are left alone, the mirror only proxies Central.
+// Plugin resolution tries the mirror before the Gradle Plugin Portal, as the portal redirects
+// everything it doesn't host to Maven Central, e.g. the Spring Boot plugin's dependencies:
+//
+//   plugins { id(...) } ──► $MAVEN_MIRROR_URL   (dependencies)
+//                       └─► Gradle Plugin Portal (markers, plugins hosted by the portal)
 //
 // Needs env:
 //   MAVEN_MIRROR_URL       e.g. http://localhost:18080/central, unset or empty disables the mirror
@@ -23,6 +27,14 @@ class MavenMirrorPlugin implements Plugin<Gradle> {
     private static final String PASSWORD_ENV = 'MAVEN_MIRROR_PASSWORD'
 
     private static final String INSECURE_SCHEME = 'http'
+
+    private static final String MIRROR_REPO_NAME = 'MavenMirror'
+
+    // Keeps the portal's standard name free for the build's own gradlePluginPortal()
+    private static final String DEFAULT_PORTAL_NAME = 'MavenMirrorDefaultPortal'
+
+    // Plugin markers live on the portal only, e.g. org.springframework.boot:org.springframework.boot.gradle.plugin
+    private static final String MARKER_MODULE_REGEX = '.*\\.gradle\\.plugin'
 
     // Hosts serving Maven Central, e.g. https://repo.maven.apache.org/maven2/
     private static final Set<String> CENTRAL_HOSTS = ['repo.maven.apache.org', 'repo1.maven.org'] as Set
@@ -48,6 +60,7 @@ class MavenMirrorPlugin implements Plugin<Gradle> {
         gradle.beforeSettings { settings ->
             mirror(settings.buildscript.repositories)
             mirror(settings.pluginManagement.repositories)
+            addToPlugins(settings.pluginManagement.repositories)
         }
 
         gradle.settingsEvaluated { settings ->
@@ -71,26 +84,45 @@ class MavenMirrorPlugin implements Plugin<Gradle> {
         return value
     }
 
-    private void mirror(RepositoryHandler repositories) {
-        // Locals, as closures would resolve url/password on their delegate (repository, credentials) first.
-        URI mirrorUrl = url
-        String mirrorUser = user
-        String mirrorPassword = password
-        boolean insecure = mirrorUrl.scheme?.toLowerCase(Locale.ROOT) == INSECURE_SCHEME
+    private void addToPlugins(RepositoryHandler repositories) {
+        repositories.maven {
+            it.name = MIRROR_REPO_NAME
+            point(it)
 
+            // Skip the mirror lookup for markers, they are never on Maven Central
+            it.content { c -> c.excludeModuleByRegex('.*', MARKER_MODULE_REGEX) }
+        }
+
+        // Gradle only uses the portal if no plugin repository is declared, adding the mirror disables that.
+        // So add the portal as default, and drop it once the build declares its own repositories.
+        ArtifactRepository defaultPortal = repositories.gradlePluginPortal { it.name = DEFAULT_PORTAL_NAME }
+        repositories.whenObjectAdded {
+            if (repositories.contains(defaultPortal)) {
+                repositories.remove(defaultPortal)
+            }
+        }
+    }
+
+    private void mirror(RepositoryHandler repositories) {
         repositories.withType(MavenArtifactRepository)
             .matching { isCentral(it) }
-            .configureEach {
-                it.url = mirrorUrl
+            .configureEach { point(it) }
+    }
 
-                // Gradle rejects plain HTTP unless allowed, e.g. http://localhost:18080/central
-                it.allowInsecureProtocol = insecure
+    private void point(MavenArtifactRepository repository) {
+        // Locals, as closures would resolve url/password on their delegate (repository, credentials) first.
+        String mirrorUser = user
+        String mirrorPassword = password
 
-                it.credentials { c ->
-                    c.username = mirrorUser
-                    c.password = mirrorPassword
-                }
-            }
+        repository.url = url
+
+        // Gradle rejects plain HTTP unless allowed, e.g. http://localhost:18080/central
+        repository.allowInsecureProtocol = url.scheme?.toLowerCase(Locale.ROOT) == INSECURE_SCHEME
+
+        repository.credentials { c ->
+            c.username = mirrorUser
+            c.password = mirrorPassword
+        }
     }
 
     private static boolean isCentral(MavenArtifactRepository repository) {
