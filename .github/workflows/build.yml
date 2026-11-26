@@ -10,10 +10,13 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
+        project: [maven, gradle]
+        # Adds the build command to each os / project combination
         include:
           - project: maven
             command: ./mvnw --batch-mode verify
@@ -37,6 +40,12 @@ jobs:
           for host in $MAVEN_CENTRAL_HOSTS; do
             printf '0.0.0.0 %s\n:: %s\n' "$host" "$host" | sudo tee -a /etc/hosts
           done
+
+          # macOS caches lookups in mDNSResponder, so drop cached Central addresses
+          if [ "$RUNNER_OS" = macOS ]; then
+            sudo dscacheutil -flushcache
+            sudo killall -HUP mDNSResponder
+          fi
 
       # Fail if the blackhole doesn't work
       - name: Verify Maven Central is unreachable
