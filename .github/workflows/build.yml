@@ -20,6 +20,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          # Log downloads, to show they come from the mirror
+          show-download-progress: true
 
       # Resolve Maven Central to unroutable addresses (IPv4 + IPv6), so any access fails fast
       - name: Blackhole Maven Central
