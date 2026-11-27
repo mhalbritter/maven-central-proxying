@@ -18,6 +18,25 @@ Gradle ──► ~/.gradle/init.d/maven-mirror.init.gradle ──┘
 | `username` | Mirror username                                      |
 | `password` | Mirror password or token                             |
 
+### Maven Wrapper
+
+`mvnw` downloads Maven through the mirror only if it is an [Apache Maven Wrapper](https://maven.apache.org/tools/wrapper/) 3.2.0 or newer. Older wrappers, e.g. Takari's `io.takari:maven-wrapper`, ignore the mirror and download Maven from Maven Central.
+
+Check the version in the `mvnw` header:
+
+```
+# Apache Maven Wrapper startup batch script, version 3.3.4   ← supported
+# Maven2 Start Up Batch script                               ← too old
+```
+
+Update it, keeping the Maven version from `.mvn/wrapper/maven-wrapper.properties`:
+
+```bash
+./mvnw -N org.apache.maven.plugins:maven-wrapper-plugin:3.3.4:wrapper
+```
+
+This replaces `mvnw`, `mvnw.cmd` and `maven-wrapper.properties`, and deletes `.mvn/wrapper/maven-wrapper.jar`.
+
 ## `blackhole-maven-central`
 
 Makes Maven Central unreachable for the rest of the job. Use it before the mirror action to prove builds don't bypass the mirror.
