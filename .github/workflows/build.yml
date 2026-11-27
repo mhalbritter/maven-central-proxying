@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    env:
+      # Step conditions can't read secrets, e.g. no mirror on forks
+      HAS_MAVEN_MIRROR: ${{ secrets.MAVEN_MIRROR_URL != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,9 +36,11 @@ jobs:
           show-download-progress: true
 
       # Proves the builds below don't bypass the mirror
-      - uses: ./.github/actions/blackhole-maven-central
+      - if: ${{ env.HAS_MAVEN_MIRROR == 'true' }}
+        uses: ./.github/actions/blackhole-maven-central
 
-      - uses: ./.github/actions/maven-central-mirror
+      - if: ${{ env.HAS_MAVEN_MIRROR == 'true' }}
+        uses: ./.github/actions/maven-central-mirror
         with:
           url: ${{ secrets.MAVEN_MIRROR_URL }}
           username: ${{ secrets.MAVEN_MIRROR_USERNAME }}
