@@ -7,9 +7,9 @@ GitHub Actions to route Maven and Gradle builds through a Maven Central mirror.
 Makes all later Maven and Gradle builds in the job download Maven Central artifacts from a mirror.
 
 ```
-Maven  ──► MAVEN_ARGS --global-settings settings.xml ──┐
-mvnw   ──► MVNW_REPOURL (Maven distribution) ──────────┼──► mirror ──► Maven Central
-Gradle ──► ~/.gradle/init.d/maven-mirror.init.gradle ──┘
+Maven  ──► MAVEN_ARGS / MAVEN_CONFIG --global-settings settings.xml ──┐
+mvnw   ──► MVNW_REPOURL (Maven distribution) ─────────────────────────┼──► mirror ──► Maven Central
+Gradle ──► ~/.gradle/init.d/maven-mirror.init.gradle ─────────────────┘
 ```
 
 | Input      | Description                                          |

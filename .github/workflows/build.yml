@@ -14,10 +14,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        project: [maven, gradle]
+        # maven-bin-wrapper: mvnw runs the committed maven-wrapper.jar instead of bin/mvn
+        project: [maven, maven-bin-wrapper, gradle]
         # Adds the build command to each os / project combination
         include:
           - project: maven
+            command: ./mvnw --batch-mode verify
+          - project: maven-bin-wrapper
             command: ./mvnw --batch-mode verify
           - project: gradle
             command: ./gradlew build

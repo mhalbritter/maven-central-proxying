@@ -1,4 +1,5 @@
 .idea/
 maven/target/
+maven-bin-wrapper/target/
 gradle/build/
 gradle/.gradle/
