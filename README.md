@@ -63,3 +63,35 @@ jobs:
       # Gradle
       - run: ./gradlew build
 ```
+
+## Running locally
+
+Uses the same files as the action.
+
+```bash
+# Read by settings.xml and the init script
+export MAVEN_MIRROR_URL=https://repo.example.com/central
+export MAVEN_MIRROR_USERNAME=me
+export MAVEN_MIRROR_PASSWORD=secret
+
+base=https://raw.githubusercontent.com/mhalbritter/maven-central-proxying/main/.github/actions/maven-central-mirror
+```
+
+### Maven:
+
+```bash
+curl -fsSLO "$base/settings.xml"
+./mvnw --global-settings settings.xml -Dmaven.repo.local=/tmp/mirror-test-m2 verify
+```
+
+Drop `-Dmaven.repo.local` to use your Maven cache.
+
+### Gradle:
+
+```bash
+curl -fsSLO "$base/maven-mirror.init.gradle"
+GRADLE_USER_HOME=/tmp/mirror-test-gradle ./gradlew -I maven-mirror.init.gradle build --info
+```
+
+Drop the `GRADLE_USER_HOME` variable to use your Gradle cache.
+
